@@ -313,7 +313,10 @@ def run_strategy():
         logging.error("无法获取账户余额, 策略中止。")
         return
     
-    wallet = balance_data.get("Wallet", {})
+# --- 逻辑修改 ---
+    # 优先尝试获取 "Wallet", 如果不存在, 再尝试获取 "SpotWallet"
+    # 如果两者都不存在, 则返回一个空字典, 避免程序出错
+    wallet = balance_data.get("Wallet") or balance_data.get("SpotWallet") or {}
     total_portfolio_value = wallet.get("USD", {}).get("Free", 0)
     current_holdings = {}
     for coin, data in wallet.items():
