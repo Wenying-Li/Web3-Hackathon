@@ -14,8 +14,8 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 # --- 核心配置 ---
-API_KEY = "AsQb4BENw84ot5mAugsXw88o8f37tEK75LJdAveGZvKlvEhbQRQETJElcPZ9CkAE"
-SECRET = "uO4TvgFoPcOHPgYPHs398wcqIpAR34khlpbJoPflHdpJGQVUHKosIXTMli7GNUAh"
+API_KEY = "qJ7dLk28aZp3VhR9T2mN5yX4cB8sGfQ1wE6rUjD3H0nCzK5PoL4iMb7SYt9Aa2Fx"
+SECRET = "zXcV1bN5mQwE3rT7yUiP9oA0sDdF4gJ6hKlZ2xC8vBnM4qW2eRtY6uI1oPaS5dF7g"
 BASE_URL = "https://mock-api.roostoo.com"
 
 # --- 数据与日志文件 ---
