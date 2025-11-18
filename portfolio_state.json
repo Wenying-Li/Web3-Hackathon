@@ -1,0 +1,12 @@
+{
+    "SOL/USD": {
+        "avg_buy_price": 164.42,  
+        "original_quantity": 1,  
+        "tp_stage": 0              
+    },
+    "UNI/USD": {
+        "avg_buy_price": 7.543,   
+        "original_quantity": 296,   
+        "tp_stage": 0              
+    }
+}
