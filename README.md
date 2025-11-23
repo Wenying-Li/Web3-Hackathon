@@ -38,34 +38,72 @@ The bot employs an active risk management system that runs every hour:
 
 ## 🛠️ Technical Implementation
 
-The bot is built in **Python 3** and leverages a modular architecture to separate API interaction, data analysis, and execution logic.
+### 1. Data Pipeline & Persistence (`collect_daily_price_data`)
+The bot maintains a local database to record daily prices and volumes to help with looking-back decisions.
+*   **Hybrid Data Source:** It combines historical data from `price_history_new.csv` with real-time snapshots from `client.get_ticker()`.
+*   **Idempotent Updates:** The function generates a primary key using the current UTC date (`today_utc_str`).
+    *   If the date exists in the CSV: It **updates** the row (handling intra-day data changes).
+    *   If the date is new: It **appends** a new row.
+*   **Benefit:** This ensures the bot always has the latest daily candle to calculate moving averages immediately, without waiting for a daily close.
 
-### 1. Core Libraries & Stack
-*   **Pandas:** Used for all data manipulation. The bot maintains a local CSV database (`price_history_new.csv`) and uses Pandas DataFrames for vectorized calculations of momentum, volatility, and moving averages.
-*   **Pandas-TA:** Dedicated library for calculating technical indicators (SMA, RSI) efficiently.
-*   **APScheduler:** A `BlockingScheduler` is used to orchestrate tasks using Cron-style triggers, ensuring regular timing for market scans (4-hour intervals) and risk checks (hourly).
-*   **Requests & HMAC:** Use `RoostooV3Client` class to handle the API calls.
+### 2. Dynamic Filtering Logic (`filter_and_rank_assets`)
 
-### 2. Data & State Management
-The bot is designed to be stateless regarding the runtime memory but stateful via local files to survive restarts:
-*   **Historical Data (`price_history_new.csv`):** To avoid API rate limits and ensure sufficient lookback for indicators (SMA, Volatility), the bot incrementally updates this CSV with daily OHLCV data.
-*   **Portfolio State (`portfolio_state.json`):** The bot records the entry price and the stage of risk management.
-    *   **Tracks:** `avg_buy_price` (for accurate Stop-Loss calculations), `original_quantity`, and `tp_stage` (0, 1, 2, or 3) to ensure the risk management process is handled correctly.
-### 3. Quantitative Logic
-*   **Volatility Calculation:** Standard deviation of percentage returns over a 7-day rolling window.
-*   **Inverse Volatility Weighting:**
-    The code implements a risk-parity approach where position size is inversely proportional to risk.
+*   **Step 1: Dynamic Thresholds**
+    The code calculates the 70th percentile (`0.7`) for both volume and volatility across the *entire market*.
     ```python
-    inverse_volatilities = {t['pair']: 1 / t['volatility'] ...}
-    weight = inv_vol / sum_inverse_vol
+    volume_threshold = volumes.quantile(0.7)
+    volatility_threshold = volatility.quantile(0.7)
     ```
-    This ensures that highly volatile assets receive a smaller allocation, smoothing out the portfolio's equity curve.
+*   **Step 2: Set Intersection**
+    It identifies assets that meet *both* criteria using Python set operations:
+    ```python
+    final_candidates = list(volume_candidates & volatility_candidates)
+    ```
+*   **Step 3: Momentum Ranking**
+    Candidates are sorted by 3-day returns (`pct_change(3)`), prioritizing assets with the strongest recent trend.
 
-### 4. Execution Logic
-*   **Rebalancing:** The `run_strategy` function calculates the difference between the *Target Value* (Equity * Weight) and *Current Value*.
-    *   If `Target > Current`: **Buy** to fill the gap.
-    *   If `Target < Current`: **Sell** to trim the position.
-*   **Filters:** Uses Pandas `quantile(0.7)` to dynamically determine the top 30% thresholds for volume and volatility, ensuring the bot adapts to changing market conditions rather than using hardcoded values.
+### 3. Indicator Implementation (`StrategyAnalytics`)
+The code utilizes `pandas_ta` for vectorized technical analysis, ensuring speed even with large datasets.
+
+*   **Entry Signal Logic:**
+    Calculates indicators on the full price series but only evaluates the *last* data point (`iloc[-1]`):
+    ```python
+    sma7 = ta.sma(series, length=7).iloc[-1]
+    rsi7 = ta.rsi(series, length=7).iloc[-1]
+    # Condition: Price dip buying in an uptrend
+    price_above_sma = last_price > (sma7 * 0.95)
+    ```
+*   **Exit Signal Logic:**
+    Includes a "Panic/Euphoria" check. It exits if RSI > 80 (Overbought) OR RSI < 30 (Oversold), protecting against extreme reversals.
+
+### 4. Risk-Parity Position Sizing
+The bot does not allocate capital equally. It mathematically smooths risk using **Inverse Volatility Weighting**.
+
+1.  **Calculate Inverse Volatility:** `1 / volatility` for each target.
+2.  **Normalize Weights:**
+    ```python
+    weight = inv_vol / sum_inverse_vol
+    weight = min(weight, 0.05)  # Hard cap at 5% allocation
+    ```
+3.  **Result:** An asset that is twice as volatile as another will receive roughly half the capital allocation.
+
+### 5. Stateful Order Management (`portfolio_state.json`)
+To handle **Staged Take-Profits (TP)**, the bot must "remember" which levels have already been sold.
+
+*   **The Problem:** If the price hits +15%, the bot sells 30%. If the price drops to +14% and rises to +15% again, a stateless bot would sell *another* 30%, draining the position.
+*   **The Solution (`tp_stage`):**
+    The `portfolio_state.json` file tracks a `tp_stage` integer (0-3):
+    *   **Stage 0:** Fresh position.
+    *   **Stage 1:** Sold at +5%.
+    *   **Stage 2:** Sold at +10%.
+    *   **Stage 3:** Sold at +15%.
+    The code explicitly checks `if profit > level AND tp_stage < level_stage` before executing a sell.
+
+### 6. Automated Scheduling (`APScheduler`)
+The system runs on three separate timelines using `BlockingScheduler`:
+1.  **Data Collection (Cron: 00, 04...):** Runs exactly on the hour to capture "close" prices.
+2.  **Strategy Execution (Cron: 00:15...):** Runs 15 minutes *after* data collection to ensure the dataset is fresh and write operations are complete.
+3.  **Risk Daemon (Cron: *:30):** A separate "Watchdog" process that runs every hour at minute 30. It purely checks for Stop-Loss and Take-Profit triggers, independent of the trend strategy.
 
 ## Repository Files
 * **final_v1.py** is the first version of code we deployed.
