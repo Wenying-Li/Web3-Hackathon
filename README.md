@@ -99,11 +99,11 @@ To handle **Staged Take-Profits (TP)**, the bot must "remember" which levels hav
     *   **Stage 3:** Sold at +15%.
     The code explicitly checks `if profit > level AND tp_stage < level_stage` before executing a sell.
 
-### 6. Automated Scheduling (`APScheduler`)
+### 6. Automated Scheduling (`APScheduler`) 🕙
 The system runs on three separate timelines using `BlockingScheduler`:
-1.  **Data Collection (Cron: 00, 04...):** Runs exactly on the hour to capture "close" prices.
-2.  **Strategy Execution (Cron: 00:15...):** Runs 15 minutes *after* data collection to ensure the dataset is fresh and write operations are complete.
-3.  **Risk Daemon (Cron: *:30):** A separate "Watchdog" process that runs every hour at minute 30. It purely checks for Stop-Loss and Take-Profit triggers, independent of the trend strategy.
+1.  **Data Collection (Cron: 00:00, 04:00, ...):** Runs every four hours to capture the prices.
+2.  **Strategy Execution (Cron: 00:15, 04:30, ...):** Runs 15 minutes *after* data collection to ensure the dataset is fresh and write operations are complete.
+3.  **Risk Daemon (Cron: 00:30, 01:30, ...):** A separate risk management process that runs every hour at minute 30. It purely checks for Stop-Loss and Take-Profit triggers, independent of the trend strategy.
 
 ## Repository Files
 * **final_v1.py** is the first version of code we deployed.
