@@ -36,6 +36,37 @@ The bot employs an active risk management system that runs every hour:
 *   **Strategy Rebalancing:** Runs every 4 hours (15 minutes past the hour).
 *   **Risk Check (SL/TP):** Runs hourly (30 minutes past the hour).
 
+## 🛠️ Technical Implementation
+
+The bot is built in **Python 3** and leverages a modular architecture to separate API interaction, data analysis, and execution logic.
+
+### 1. Core Libraries & Stack
+*   **Pandas:** Used for all data manipulation. The bot maintains a local CSV database (`price_history_new.csv`) and uses Pandas DataFrames for vectorized calculations of momentum, volatility, and moving averages.
+*   **Pandas-TA:** Dedicated library for calculating technical indicators (SMA, RSI) efficiently.
+*   **APScheduler:** A `BlockingScheduler` is used to orchestrate tasks using Cron-style triggers, ensuring regular timing for market scans (4-hour intervals) and risk checks (hourly).
+*   **Requests & HMAC:** Use `RoostooV3Client` class to handle the API calls.
+
+### 2. Data & State Management
+The bot is designed to be stateless regarding the runtime memory but stateful via local files to survive restarts:
+*   **Historical Data (`price_history_new.csv`):** To avoid API rate limits and ensure sufficient lookback for indicators (SMA, Volatility), the bot incrementally updates this CSV with daily OHLCV data.
+*   **Portfolio State (`portfolio_state.json`):** The bot records the entry price and the stage of risk management.
+    *   **Tracks:** `avg_buy_price` (for accurate Stop-Loss calculations), `original_quantity`, and `tp_stage` (0, 1, 2, or 3) to ensure the risk management process is handled correctly.
+### 3. Quantitative Logic
+*   **Volatility Calculation:** Standard deviation of percentage returns over a 7-day rolling window.
+*   **Inverse Volatility Weighting:**
+    The code implements a risk-parity approach where position size is inversely proportional to risk.
+    ```python
+    inverse_volatilities = {t['pair']: 1 / t['volatility'] ...}
+    weight = inv_vol / sum_inverse_vol
+    ```
+    This ensures that highly volatile assets receive a smaller allocation, smoothing out the portfolio's equity curve.
+
+### 4. Execution Logic
+*   **Rebalancing:** The `run_strategy` function calculates the difference between the *Target Value* (Equity * Weight) and *Current Value*.
+    *   If `Target > Current`: **Buy** to fill the gap.
+    *   If `Target < Current`: **Sell** to trim the position.
+*   **Filters:** Uses Pandas `quantile(0.7)` to dynamically determine the top 30% thresholds for volume and volatility, ensuring the bot adapts to changing market conditions rather than using hardcoded values.
+
 ## Repository Files
 * **final_v1.py** is the first version of code we deployed.
 * **final_v2.py** is the one-time update of code during the competition.
