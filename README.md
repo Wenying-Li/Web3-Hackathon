@@ -1,5 +1,5 @@
 # Web3-Hackathon
-## 📈 Strategy Documentation
+##  Strategy Documentation
 
 This trading bot implements a **Momentum-based strategy with Volatility adjustments**, designed to capture trends in liquid assets while managing risk through strict entry/exit criteria and position sizing.
 
@@ -36,7 +36,7 @@ The bot employs an active risk management system that runs every hour:
 *   **Strategy Rebalancing:** Runs every 4 hours (15 minutes past the hour).
 *   **Risk Check (SL/TP):** Runs hourly (30 minutes past the hour).
 
-## 🛠️ Technical Implementation
+##  Technical Implementation
 
 ### 1. Data Pipeline & Persistence (`collect_daily_price_data`)
 The bot maintains a local database to record daily prices and volumes to help with looking-back decisions.
@@ -99,7 +99,7 @@ To handle **Staged Take-Profits (TP)**, the bot must "remember" which levels hav
     *   **Stage 3:** Sold at +15%.
     The code explicitly checks `if profit > level AND tp_stage < level_stage` before executing a sell.
 
-### 6. Automated Scheduling (`APScheduler`) 🕙
+### 6. Automated Scheduling (`APScheduler`) 
 The system runs on three separate timelines using `BlockingScheduler`:
 1.  **Data Collection (Cron: 00:00, 04:00, ...):** Runs every four hours to capture the prices.
 2.  **Strategy Execution (Cron: 00:15, 04:30, ...):** Runs 15 minutes *after* data collection to ensure the dataset is fresh and write operations are complete.
